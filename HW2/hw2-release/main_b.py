@@ -6,6 +6,7 @@ import models
 import defenses
 import utils
 import matplotlib.pyplot as plt
+import matplotlib
 import seaborn as sns
 
 sns.set_theme()
@@ -58,8 +59,26 @@ def run_evaluation(sigma):
 def plot_radii(radii):
     x = [] # radius
     y = [] # accuracy
-    # derive x and y from the certified radii - FILL ME
-    
+    # derive x and y from the certified radii
+
+    sorted_radii = sorted(radii)
+    for i, radius in enumerate(sorted_radii):
+        if radius != 0:
+            x.append(radius)
+            y.append((len(sorted_radii) - i)/len(sorted_radii))
+    """
+    x = [r for r in radii if r>0]
+
+    count = 0
+    for r in x:
+        for t in x:
+            if t>r:
+                count+=1
+        y.append(count/len(radii))
+        count = 0
+
+    """
+
     # plot
     plt.plot(x,y)
 
@@ -71,6 +90,7 @@ if __name__=='__main__':
         radii[sigma] = run_evaluation(sigma)
 
     # plot
+    matplotlib.use('Agg')
     plt.figure()
     for sigma in sigmas:
         plot_radii(radii[sigma])

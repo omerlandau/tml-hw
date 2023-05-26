@@ -102,8 +102,8 @@ def run_evaluation():
 
     # load standard and adversarially trained mdoels
     trained_models = {}
-    mpaths = {'standard': 'trained-models/simple-cnn',
-              'adv_trained': 'trained-models/simple-cnn-free-adv-trained'}
+    mpaths = {'standard': "/a/home/cc/students/cs/omerlandau1/foromerlandau/tml-hw/HW2/hw2-release/trained-models/simple-cnn",
+              'adv_trained': "/a/home/cc/students/cs/omerlandau1/foromerlandau/tml-hw/HW2/hw2-release/trained-models/simple-cnn-free-adv-trained"}
     for mtype in mpaths:
         model = models.SimpleCNN()
         model.load_state_dict(torch.load(mpaths[mtype]))
