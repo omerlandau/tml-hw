@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.autograd import Variable
+from math import ceil
 
 from scipy.stats import norm
 from statsmodels.stats.proportion import proportion_confint
@@ -34,17 +36,44 @@ def free_adv_train(model, data_tr, criterion, optimizer, lr_scheduler, \
                            num_workers=dl_nw)
                            
 
-    # init delta (adv. perturbation) - FILL ME
-    
+    # init delta (adv. perturbation)    
 
-    # total number of updates - FILL ME
+    tmp_input, _ = next(iter(loader_tr))
     
+    delta = torch.zeros_like(tmp_input).to(device)
+
+    # total number of updates
+
+    totatl_updates_num = int(np.ceil(epochs/m))
 
     # when to update lr
+
     scheduler_step_iters = int(np.ceil(len(data_tr)/batch_size))
 
-    # train - FILLE ME
-    
+    # train 
+
+    for epoch in range(totatl_updates_num):
+        for _, data in enumerate(loader_tr, 0):
+            inputs, labels = data[0].to(device), data[1].to(device)
+            for _ in range(m):
+                noise = Variable(delta[:inputs.size(0)], requires_grad=True).to(device)
+                noisy_input = inputs + noise
+                #FILL ME
+                output = model(noisy_input)
+                
+                loss = criterion(output, labels)
+
+                optimizer.zero_grad()
+                loss.backward()
+
+                noise_update = eps*torch.sign(noise.grad)
+                delta[:inputs.size(0)] += noise_update
+                delta.clamp_(-eps, eps)
+
+                optimizer.step()
+
+        if epoch%scheduler_step_iters == 0:
+            lr_scheduler.step()
     
     # done
     return model
@@ -59,9 +88,10 @@ class SmoothedModel():
 
     ABSTAIN = -1
 
-    def __init__(self, model, sigma):
+    def __init__(self, model, sigma, num_classes=4):
         self.model = model
         self.sigma = sigma
+        self.num_classes = num_classes
 
     def _sample_under_noise(self, x, n, batch_size):
         """
@@ -70,8 +100,25 @@ class SmoothedModel():
         array counting how many times each class was assigned the
         max confidence).
         """
-        # FILL ME
-        pass
+
+        def count_err(array, size):
+            counts = np.zeros(size, dtype=int)
+            for i in array:
+                counts[i] += 1
+            return counts
+        
+        nc = self.num_classes
+        
+        with torch.no_grad():
+            counts = np.zeros(nc, dtype=int)
+            for _ in range(ceil(n / batch_size)):
+                current_bs = min(batch_size, n)
+                n -= current_bs
+                batch = x.repeat((current_bs, 1, 1, 1))
+                noise = torch.randn_like(batch).to("cuda") * self.sigma
+                predictions = self.model(batch + noise).argmax(1)
+                counts += count_err(predictions.cpu().numpy(), nc)
+            return counts
         
     def certify(self, x, n0, n, alpha, batch_size):
         """
@@ -89,13 +136,21 @@ class SmoothedModel():
         - certified radius (0. in case of abstaining)
         """
         
-        # find prediction (top class c) - FILL ME
-        
-        
-        # compute lower bound on p_c - FILL ME
-        
+        # find prediction (top class c)
 
-        # done
+        c = self._sample_under_noise(x,n0,batch_size)
+        c = c.argmax.item()
+
+        c_estimate = self._sample_under_noise(x, n, batch_size)
+        p_c = c_estimate[c].item()
+        
+        # compute lower bound on p_c
+        l_b = proportion_confint(p_c, n, alpha=2*alpha, method="beta")
+        
+        if l_b < 0.5:
+            return SmoothedModel.ABSTAIN, 0.0
+        
+        radius = self.sigma* norm.ppf(l_b)
         return c, radius
         
 
@@ -133,10 +188,51 @@ class NeuralCleanse:
         - mask: 
         - trigger: 
         """
-        # randomly initialize mask and trigger in [0,1] - FILL ME
-        
+        # randomly initialize mask and trigger in [0,1]
 
-        # run self.niters of SGD to find (potential) trigger and mask - FILL ME
+        mask = torch.rand((1,1,self.dim[2], self.dim[3]), requires_grad=True).to(device)
+        trigger = torch.rand(self.dim).to(device)
+
+        # run self.niters of SGD to find (potential) trigger and mask
+
+        optimizer = torch.optim.SGD(params=self.model.parameters(),lr=self.step_size)
+
+        sgd_count = 0
+
+        while sgd_count <= self.niters:
+            for _, data in enumerate(data_loader, 0):
+                inputs, labels = data[0].to(device), data[1].to(device)
+                
+                batch_trigger = (mask*trigger)
+                batch_mask = (torch.ones((1,1,self.dim[2], self.dim[3]), requires_grad=True).to(device) - mask)
+                t_i = batch_mask*inputs + batch_trigger
+
+                outputs = self.model(t_i)
+
+                optimizer.zero_grad()
+
+                # build a misclassified labels for the batch all are c_t
+
+                print(labels.size())
+                m_labels = torch.tensor(labels.size())
+                m_labels[c_t] = 1
+                m_labels.to(device)
+
+                print(m_labels)
+
+                loss = self.loss_func(outputs, m_labels)
+                loss += self.lambda_c*torch.norm(mask, p=1).to(device)
+                loss.backward()
+
+                optimizer.step()
+                sgd_count += 1
+
+
+
+
+
+
+
         
 
         # done

@@ -58,8 +58,18 @@ def run_evaluation(sigma):
 def plot_radii(radii):
     x = [] # radius
     y = [] # accuracy
-    # derive x and y from the certified radii - FILL ME
-    
+    # derive x and y from the certified radii
+
+    x = [r for r in radii if r>0]
+
+    count = 0
+    for r in x:
+        for t in x:
+            if t>r:
+                count+=1
+        y.append(count/len(radii))
+        count = 0
+
     # plot
     plt.plot(x,y)
 
