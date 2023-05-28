@@ -91,10 +91,9 @@ class SmoothedModel():
 
     ABSTAIN = -1
 
-    def __init__(self, model, sigma, num_classes=4):
+    def __init__(self, model, sigma):
         self.model = model
         self.sigma = sigma
-        self.num_classes = num_classes
 
     def _sample_under_noise(self, x, n, batch_size):
         """
@@ -110,7 +109,8 @@ class SmoothedModel():
                 counts[i] += 1
             return counts
         
-        nc = self.num_classes
+        nc = 4 # There are four classes in the SimpleCNN model, 
+               # if this parameter can change, please add it to the class.
         
         with torch.no_grad():
             counts = np.zeros(nc, dtype=int)
